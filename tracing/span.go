@@ -23,6 +23,11 @@ import (
 	"github.com/docker/distribution/uuid"
 )
 
+// Span is the ciao tracing singleton.
+// A Span will carry a trace message together with an
+// optional component specific binary payload.
+// Spans can be linked together and eventually form a
+// tracing tree.
 type Span struct {
 	uuid        uuid.UUID
 	parentUUID  uuid.UUID
@@ -34,17 +39,23 @@ type Span struct {
 	message          string
 }
 
+// Spanner is a span interface for components to add their specific
+// binary payloads to any given Span.
 type Spanner interface {
+	// Span takes a component specific structure and returns a binary payload.
 	Span(componentContext interface{}) []byte
 }
 
+// String formats a span into a Go string.
 func (s Span) String() string {
 	return fmt.Sprintf("\n\tSpan UUID [%s]\n\tParent UUID [%s]\n\tTimestamp [%v]\n\tComponent [%s]\n\tMessage [%s]\n",
 		s.uuid, s.parentUUID, s.timestamp, s.component, s.message)
 }
 
+// AnonymousSpanner is the Anonymous component Spanner implementation
 type AnonymousSpanner struct{}
 
+// Span returns a nil payload for Anonymous components.
 func (s AnonymousSpanner) Span(context interface{}) []byte {
 	return nil
 }
