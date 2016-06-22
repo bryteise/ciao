@@ -17,6 +17,8 @@
 package trace
 
 import (
+	"fmt"
+
 	"github.com/docker/distribution/uuid"
 )
 
@@ -28,10 +30,15 @@ const (
 	Libsnnet  Component = "libsnnet"
 )
 
+const nullUUID = "00000000-0000-0000-0000-000000000000"
+const spanChannelDepth = 256
+
 type Tracer struct {
 	ssntpUUID uuid.UUID
 	component Component
 	spanner   Spanner
+
+	spanChannel chan Span
 }
 
 type TraceContext struct {
@@ -39,11 +46,39 @@ type TraceContext struct {
 }
 
 func NewComponentTracer(component Component, spanner Spanner, ssntpUUID uuid.UUID) (*Tracer, *TraceContext, error) {
-	return nil, nil, nil
+	rootUUID, err := uuid.Parse(nullUUID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	tracer := Tracer{
+		ssntpUUID:   ssntpUUID,
+		component:   component,
+		spanner:     spanner,
+		spanChannel: make(chan Span, spanChannelDepth),
+	}
+
+	traceContext := TraceContext{
+		parentUUID: rootUUID,
+	}
+
+	go tracer.spanListener()
+
+	return &tracer, &traceContext, nil
 }
 
 func NewTracer(ssntpUUID uuid.UUID) (*Tracer, *TraceContext, error) {
 	return NewComponentTracer(Anonymous, AnonymousSpanner{}, ssntpUUID)
+}
+
+func (t *Tracer) spanListener() {
+	for {
+		select {
+		case span := <-t.spanChannel:
+			// TODO Send spans to collectors
+			fmt.Printf("SPAN: %s\n", span)
+		}
+	}
 }
 
 func (t *Tracer) Stop() {
