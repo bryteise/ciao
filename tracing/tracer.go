@@ -61,8 +61,13 @@ type Context struct {
 }
 
 // NewComponentTracer creates a tracer for a specific component.
-func NewComponentTracer(component Component, spanner Spanner, ssntpUUID uuid.UUID) (*Tracer, *Context, error) {
+func NewComponentTracer(component Component, spanner Spanner, ssntpuuid string) (*Tracer, *Context, error) {
 	rootUUID, err := uuid.Parse(nullUUID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ssntpUUID, err := uuid.Parse(ssntpuuid)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -84,8 +89,9 @@ func NewComponentTracer(component Component, spanner Spanner, ssntpUUID uuid.UUI
 }
 
 // NewTracer creates an anonymous tracer.
-func NewTracer(ssntpUUID uuid.UUID) (*Tracer, *Context, error) {
-	return NewComponentTracer(Anonymous, AnonymousSpanner{}, ssntpUUID)
+// uuid is the SSNTP UUID of the caller.
+func NewTracer(uuid string) (*Tracer, *Context, error) {
+	return NewComponentTracer(Anonymous, AnonymousSpanner{}, uuid)
 }
 
 func (t *Tracer) spanListener() {
