@@ -18,6 +18,7 @@ package trace
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/docker/distribution/uuid"
 )
@@ -41,6 +42,18 @@ const (
 const nullUUID = "00000000-0000-0000-0000-000000000000"
 const spanChannelDepth = 256
 
+type status uint8
+
+const (
+	running status = iota
+	stopped
+)
+
+type tracerStatus struct {
+	sync.Mutex
+	status status
+}
+
 // Tracer is a handle to a ciao tracing agent that will collect
 // local spans and send them back to ciao trace collectors.
 type Tracer struct {
@@ -49,6 +62,9 @@ type Tracer struct {
 	spanner   Spanner
 
 	spanChannel chan Span
+	stopChannel chan struct{}
+
+	status tracerStatus
 }
 
 // Context is an opaque structure that gets passed to Trace()
@@ -77,7 +93,9 @@ func NewComponentTracer(component Component, spanner Spanner, ssntpuuid string) 
 		component:   component,
 		spanner:     spanner,
 		spanChannel: make(chan Span, spanChannelDepth),
+		stopChannel: make(chan struct{}),
 	}
+	tracer.status.status = running
 
 	traceContext := Context{
 		parentUUID: rootUUID,
@@ -100,6 +118,8 @@ func (t *Tracer) spanListener() {
 		case span := <-t.spanChannel:
 			// TODO Send spans to collectors
 			fmt.Printf("SPAN: %s\n", span)
+		case <-t.stopChannel:
+			return
 		}
 	}
 }
@@ -108,4 +128,14 @@ func (t *Tracer) spanListener() {
 // Spans will no longer be listened for and thus won't make
 // it up to a trace collector.
 func (t *Tracer) Stop() {
+	defer t.status.Unlock()
+
+	t.status.Lock()
+
+	if t.status.status != running {
+		return
+	}
+
+	t.status.status = stopped
+	close(t.stopChannel)
 }
