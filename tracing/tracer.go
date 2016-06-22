@@ -51,17 +51,17 @@ type Tracer struct {
 	spanChannel chan Span
 }
 
-// TraceContext is an opaque structure that gets passed to Trace()
+// Context is an opaque structure that gets passed to Trace()
 // calls in order to link spans together.
 // If you want to link a span A to span B, you should pass the
 // trace context returned when calling Trace() to create span A to
 // the Trace() call for creating span B.
-type TraceContext struct {
+type Context struct {
 	parentUUID uuid.UUID
 }
 
 // NewComponentTracer creates a tracer for a specific component.
-func NewComponentTracer(component Component, spanner Spanner, ssntpUUID uuid.UUID) (*Tracer, *TraceContext, error) {
+func NewComponentTracer(component Component, spanner Spanner, ssntpUUID uuid.UUID) (*Tracer, *Context, error) {
 	rootUUID, err := uuid.Parse(nullUUID)
 	if err != nil {
 		return nil, nil, err
@@ -74,7 +74,7 @@ func NewComponentTracer(component Component, spanner Spanner, ssntpUUID uuid.UUI
 		spanChannel: make(chan Span, spanChannelDepth),
 	}
 
-	traceContext := TraceContext{
+	traceContext := Context{
 		parentUUID: rootUUID,
 	}
 
@@ -84,7 +84,7 @@ func NewComponentTracer(component Component, spanner Spanner, ssntpUUID uuid.UUI
 }
 
 // NewTracer creates an anonymous tracer.
-func NewTracer(ssntpUUID uuid.UUID) (*Tracer, *TraceContext, error) {
+func NewTracer(ssntpUUID uuid.UUID) (*Tracer, *Context, error) {
 	return NewComponentTracer(Anonymous, AnonymousSpanner{}, ssntpUUID)
 }
 
