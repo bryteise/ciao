@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/distribution/uuid"
+	"github.com/01org/ciao/ssntp/uuid"
 )
 
 // Span is the ciao tracing singleton.
