@@ -64,7 +64,33 @@ type Tracer struct {
 	spanChannel chan Span
 	stopChannel chan struct{}
 
+	caCert string
+	cert   string
+
 	status tracerStatus
+}
+
+// TracerConfig represents a tracer configuration.
+// This structure is parsed when creating a new tracer
+// with NewTracer().
+type TracerConfig struct {
+	// UUID is the caller SSNTP UUID.
+	UUID string
+
+	// Component is the tracer creator component, e.g. "SSNTP"
+	// or "Libsnnet". If this string is empty, the tracer will
+	// be anonymous.
+	Component Component
+
+	// Spanner is a component specific span constructor.
+	Spanner Spanner
+
+	// CACert is the Certification Authority certificate path
+	// to use when verifiying the peer identity.
+	CAcert string
+
+	// Cert is the tracer x509 signed certificate path.
+	Cert string
 }
 
 // Context is an opaque structure that gets passed to Trace()
@@ -76,24 +102,47 @@ type Context struct {
 	parentUUID uuid.UUID
 }
 
-// NewComponentTracer creates a tracer for a specific component.
-func NewComponentTracer(component Component, spanner Spanner, ssntpuuid string) (*Tracer, *Context, error) {
+// NewTracer creates a new tracer.
+//
+func NewTracer(config *TracerConfig) (*Tracer, *Context, error) {
+	if config.UUID == "" {
+		return nil, nil, fmt.Errorf("Empty SSNTP UUID")
+	}
+
+	if config.CAcert == "" {
+		return nil, nil, fmt.Errorf("Missing CA")
+	}
+
+	if config.Cert == "" {
+		return nil, nil, fmt.Errorf("Missing private key")
+	}
+
+	if config.Component == "" {
+		config.Component = Anonymous
+	}
+
+	if config.Spanner == nil {
+		config.Spanner = AnonymousSpanner{}
+	}
+
 	rootUUID, err := uuid.Parse(nullUUID)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	ssntpUUID, err := uuid.Parse(ssntpuuid)
+	ssntpUUID, err := uuid.Parse(config.UUID)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	tracer := Tracer{
 		ssntpUUID:   ssntpUUID,
-		component:   component,
-		spanner:     spanner,
+		component:   config.Component,
+		spanner:     config.Spanner,
 		spanChannel: make(chan Span, spanChannelDepth),
 		stopChannel: make(chan struct{}),
+		caCert:      config.CAcert,
+		cert:        config.Cert,
 	}
 	tracer.status.status = running
 
@@ -104,12 +153,6 @@ func NewComponentTracer(component Component, spanner Spanner, ssntpuuid string) 
 	go tracer.spanListener()
 
 	return &tracer, &traceContext, nil
-}
-
-// NewTracer creates an anonymous tracer.
-// uuid is the SSNTP UUID of the caller.
-func NewTracer(uuid string) (*Tracer, *Context, error) {
-	return NewComponentTracer(Anonymous, AnonymousSpanner{}, uuid)
 }
 
 func (t *Tracer) spanListener() {
