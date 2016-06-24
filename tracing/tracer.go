@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/docker/distribution/uuid"
+	"github.com/01org/ciao/ssntp/uuid"
 )
 
 // Component is a tracing identifier for each ciao component.
