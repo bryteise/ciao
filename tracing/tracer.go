@@ -64,8 +64,9 @@ type Tracer struct {
 	spanChannel chan Span
 	stopChannel chan struct{}
 
-	caCert string
-	cert   string
+	collectorURI string
+	caCert       string
+	cert         string
 
 	status tracerStatus
 }
@@ -84,6 +85,11 @@ type TracerConfig struct {
 
 	// Spanner is a component specific span constructor.
 	Spanner Spanner
+
+	// CollectorURIs is the URI the tracer can connect to
+	// via SSNTP.
+	// This is also where it will push its queued spans.
+	CollectorURI string
 
 	// CACert is the Certification Authority certificate path
 	// to use when verifiying the peer identity.
@@ -136,13 +142,14 @@ func NewTracer(config *TracerConfig) (*Tracer, *Context, error) {
 	}
 
 	tracer := Tracer{
-		ssntpUUID:   ssntpUUID,
-		component:   config.Component,
-		spanner:     config.Spanner,
-		spanChannel: make(chan Span, spanChannelDepth),
-		stopChannel: make(chan struct{}),
-		caCert:      config.CAcert,
-		cert:        config.Cert,
+		ssntpUUID:    ssntpUUID,
+		component:    config.Component,
+		spanner:      config.Spanner,
+		spanChannel:  make(chan Span, spanChannelDepth),
+		stopChannel:  make(chan struct{}),
+		collectorURI: config.CollectorURI,
+		caCert:       config.CAcert,
+		cert:         config.Cert,
 	}
 	tracer.status.status = running
 
