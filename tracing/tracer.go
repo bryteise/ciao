@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/01org/ciao/ssntp"
 	"github.com/01org/ciao/ssntp/uuid"
 )
 
@@ -57,6 +58,8 @@ type tracerStatus struct {
 // Tracer is a handle to a ciao tracing agent that will collect
 // local spans and send them back to ciao trace collectors.
 type Tracer struct {
+	ssntp ssntp.Client
+
 	ssntpUUID uuid.UUID
 	component Component
 	spanner   Spanner
@@ -109,7 +112,6 @@ type Context struct {
 }
 
 // NewTracer creates a new tracer.
-//
 func NewTracer(config *TracerConfig) (*Tracer, *Context, error) {
 	if config.UUID == "" {
 		return nil, nil, fmt.Errorf("Empty SSNTP UUID")
@@ -151,18 +153,65 @@ func NewTracer(config *TracerConfig) (*Tracer, *Context, error) {
 		caCert:       config.CAcert,
 		cert:         config.Cert,
 	}
-	tracer.status.status = running
+
+	tracer.status.status = stopped
 
 	traceContext := Context{
 		parentUUID: rootUUID,
 	}
 
-	go tracer.spanListener()
+	go tracer.dialAndListen()
 
 	return &tracer, &traceContext, nil
 }
 
+// ConnectNotify is the SSNTP connection notifier
+func (t *Tracer) ConnectNotify() {
+}
+
+// DisconnectNotify is the SSNTP disconnection notifier
+func (t *Tracer) DisconnectNotify() {
+}
+
+// StatusNotify is the SSNTP status frame notifier
+func (t *Tracer) StatusNotify(status ssntp.Status, frame *ssntp.Frame) {
+}
+
+// CommandNotify is the SSNTP command frame notifier
+func (t *Tracer) CommandNotify(command ssntp.Command, frame *ssntp.Frame) {
+}
+
+// EventNotify is the SSNTP event frame notifier
+func (t *Tracer) EventNotify(event ssntp.Event, frame *ssntp.Frame) {
+}
+
+// ErrorNotify is the SSNTP error frame notifier
+func (t *Tracer) ErrorNotify(error ssntp.Error, frame *ssntp.Frame) {
+}
+
+func (t *Tracer) dialAndListen() error {
+	config := &ssntp.Config{
+		URI: t.collectorURI,
+		// TODO Add tracing specific port here
+		CAcert: t.caCert,
+		Cert:   t.cert,
+	}
+
+	err := t.ssntp.Dial(config, t)
+	if err != nil {
+		return err
+	}
+
+	go t.spanListener()
+
+	return nil
+}
+
 func (t *Tracer) spanListener() {
+	t.status.Lock()
+	t.status.status = running
+	t.status.Unlock()
+
 	for {
 		select {
 		case span := <-t.spanChannel:
