@@ -19,6 +19,7 @@ package trace
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/01org/ciao/ssntp"
 	"github.com/01org/ciao/ssntp/uuid"
@@ -64,8 +65,9 @@ type Tracer struct {
 	component Component
 	spanner   Spanner
 
-	spanChannel chan Span
-	stopChannel chan struct{}
+	spanChannel   chan Span
+	stopChannel   chan struct{}
+	statusChannel chan status
 
 	collectorURI string
 	caCert       string
@@ -144,14 +146,15 @@ func NewTracer(config *TracerConfig) (*Tracer, *Context, error) {
 	}
 
 	tracer := Tracer{
-		ssntpUUID:    ssntpUUID,
-		component:    config.Component,
-		spanner:      config.Spanner,
-		spanChannel:  make(chan Span, spanChannelDepth),
-		stopChannel:  make(chan struct{}),
-		collectorURI: config.CollectorURI,
-		caCert:       config.CAcert,
-		cert:         config.Cert,
+		ssntpUUID:     ssntpUUID,
+		component:     config.Component,
+		spanner:       config.Spanner,
+		spanChannel:   make(chan Span, spanChannelDepth),
+		stopChannel:   make(chan struct{}),
+		statusChannel: make(chan status),
+		collectorURI:  config.CollectorURI,
+		caCert:        config.CAcert,
+		cert:          config.Cert,
 	}
 
 	tracer.status.status = stopped
@@ -162,7 +165,18 @@ func NewTracer(config *TracerConfig) (*Tracer, *Context, error) {
 
 	go tracer.dialAndListen()
 
-	return &tracer, &traceContext, nil
+	select {
+	case status := <-tracer.statusChannel:
+		if status != running {
+			return nil, nil, fmt.Errorf("Tracer could not start")
+		}
+
+		return &tracer, &traceContext, nil
+
+	case <-time.After(2 * time.Second):
+		tracer.Stop()
+		return nil, nil, fmt.Errorf("Did not receive a tracer status")
+	}
 }
 
 // ConnectNotify is the SSNTP connection notifier
@@ -210,6 +224,7 @@ func (t *Tracer) dialAndListen() error {
 func (t *Tracer) spanListener() {
 	t.status.Lock()
 	t.status.status = running
+	t.statusChannel <- t.status.status
 	t.status.Unlock()
 
 	for {
