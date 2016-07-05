@@ -238,6 +238,48 @@ func (t *Tracer) spanListener() {
 	}
 }
 
+// Trace will create a new ciao trace that will eventually make it
+// to a collector that will store it.
+// Trace returns a new tracing context that callers should propagate
+// if they want to link this trace to the next ones. In other words,
+// if a next Trace() call takes the returned tracing context as an argument,
+// the two created traces will be linked together.
+func (t *Tracer) Trace(context *Context, componentContext interface{}, format string, args ...interface{}) *Context {
+	var payload []byte
+
+	if t.spanner != nil {
+		payload = t.spanner.Span(componentContext)
+	} else {
+		payload = nil
+	}
+
+	spanUUID := uuid.Generate()
+
+	span := Span{
+		uuid:             spanUUID,
+		parentUUID:       context.parentUUID,
+		creatorUUID:      t.ssntpUUID,
+		component:        t.component,
+		timestamp:        time.Now(),
+		componentPayload: payload,
+		message:          fmt.Sprintf(format, args...),
+	}
+
+	newContext := &Context{
+		parentUUID: spanUUID,
+	}
+
+	defer t.status.Unlock()
+	t.status.Lock()
+	if t.status.status != running {
+		return nil
+	}
+
+	t.spanChannel <- span
+
+	return newContext
+}
+
 // Stop will stop a tracer.
 // Spans will no longer be listened for and thus won't make
 // it up to a trace collector.
