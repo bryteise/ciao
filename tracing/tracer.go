@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/01org/ciao/payloads"
 	"github.com/01org/ciao/ssntp"
 	"github.com/01org/ciao/ssntp/uuid"
 )
@@ -61,11 +62,11 @@ type tracerStatus struct {
 type Tracer struct {
 	ssntp ssntp.Client
 
-	ssntpUUID uuid.UUID
+	ssntpUUID string
 	component Component
 	spanner   Spanner
 
-	spanChannel   chan Span
+	spanChannel   chan payloads.Span
 	stopChannel   chan struct{}
 	statusChannel chan status
 
@@ -110,7 +111,7 @@ type TracerConfig struct {
 // trace context returned when calling Trace() to create span A to
 // the Trace() call for creating span B.
 type Context struct {
-	parentUUID uuid.UUID
+	parentUUID string
 }
 
 // NewTracer creates a new tracer.
@@ -135,21 +136,14 @@ func NewTracer(config *TracerConfig) (*Tracer, *Context, error) {
 		config.Spanner = AnonymousSpanner{}
 	}
 
-	rootUUID, err := uuid.Parse(nullUUID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	ssntpUUID, err := uuid.Parse(config.UUID)
-	if err != nil {
-		return nil, nil, err
-	}
+	rootUUID := nullUUID
+	ssntpUUID := config.UUID
 
 	tracer := Tracer{
 		ssntpUUID:     ssntpUUID,
 		component:     config.Component,
 		spanner:       config.Spanner,
-		spanChannel:   make(chan Span, spanChannelDepth),
+		spanChannel:   make(chan payloads.Span, spanChannelDepth),
 		stopChannel:   make(chan struct{}),
 		statusChannel: make(chan status),
 		collectorURI:  config.CollectorURI,
@@ -244,7 +238,7 @@ func (t *Tracer) spanListener() {
 // if they want to link this trace to the next ones. In other words,
 // if a next Trace() call takes the returned tracing context as an argument,
 // the two created traces will be linked together.
-func (t *Tracer) Trace(context *Context, componentContext interface{}, format string, args ...interface{}) *Context {
+func (t *Tracer) Trace(context *Context, componentContext interface{}, format string, args ...interface{}) (*Context, error) {
 	var payload []byte
 
 	if t.spanner != nil {
@@ -253,16 +247,16 @@ func (t *Tracer) Trace(context *Context, componentContext interface{}, format st
 		payload = nil
 	}
 
-	spanUUID := uuid.Generate()
+	spanUUID := uuid.Generate().String()
 
-	span := Span{
-		uuid:             spanUUID,
-		parentUUID:       context.parentUUID,
-		creatorUUID:      t.ssntpUUID,
-		component:        t.component,
-		timestamp:        time.Now(),
-		componentPayload: payload,
-		message:          fmt.Sprintf(format, args...),
+	span := payloads.Span{
+		UUID:             spanUUID,
+		ParentUUID:       context.parentUUID,
+		CreatorUUID:      t.ssntpUUID,
+		Component:        string(t.component),
+		Timestamp:        time.Now(),
+		ComponentPayload: payload,
+		Message:          fmt.Sprintf(format, args...),
 	}
 
 	newContext := &Context{
@@ -272,12 +266,12 @@ func (t *Tracer) Trace(context *Context, componentContext interface{}, format st
 	defer t.status.Unlock()
 	t.status.Lock()
 	if t.status.status != running {
-		return nil
+		return nil, fmt.Errorf("Tracer is not running")
 	}
 
 	t.spanChannel <- span
 
-	return newContext
+	return newContext, nil
 }
 
 // Stop will stop a tracer.
