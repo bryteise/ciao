@@ -102,6 +102,18 @@ const NetAgentUUID = "6be56328-92e2-4ecd-b426-8fe529c04e0c"
 // AgentUUID is a node UUID for coordinated stop/restart/delete tests
 const AgentUUID = "4cb19522-1e18-439a-883a-f9b2a3a95f5e"
 
+// SpanUUID is a tracing span UUID for span tests
+const SpanUUID = "8ad28644-1f29-439a-883a-f9b2a3a95f5e"
+
+// ParentSpanUUID is a tracing parent span UUID for span tests
+const ParentSpanUUID = "7da23412-1e18-439a-883a-f9b2a3a95f5e"
+
+// SpanMessage is a tracing span human readable message for span tests
+const SpanMessage = "This is a Span Message"
+
+// SpanTimeStamp is a tracing span time stamp for span tests
+const SpanTimeStamp = "2016-07-10T13:25:29.717294583+02:00"
+
 //////////////////////////////////////////////////////////////////////////////
 
 // StartYaml is a sample workload START ssntp.Command payload for test usage
@@ -524,4 +536,22 @@ networks:
 // with limited node statistics and no per-instance statistics
 const PartialStatsYaml = `node_uuid: ` + AgentUUID + `
 load: 1
+`
+
+// SpansYaml is a sample tracing spans array for span tests
+const SpansYaml = `spans:
+- uuid: 8ad28644-1f29-439a-883a-f9b2a3a95f5e
+  parent_uuid: 7da23412-1e18-439a-883a-f9b2a3a95f5e
+  creator_uuid: 4cb19522-1e18-439a-883a-f9b2a3a95f5e
+  timestamp: 2016-07-10T13:25:29.717294583+02:00
+  component: anonymous
+  payload: []
+  message: This is a Span Message
+- uuid: 8ad28644-1f29-439a-883a-f9b2a3a95f5e
+  parent_uuid: 7da23412-1e18-439a-883a-f9b2a3a95f5e
+  creator_uuid: 4cb19522-1e18-439a-883a-f9b2a3a95f5e
+  timestamp: 2016-07-10T13:25:29.717294583+02:00
+  component: anonymous
+  payload: []
+  message: This is a Span Message
 `
