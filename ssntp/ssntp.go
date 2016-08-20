@@ -42,7 +42,7 @@ type Type uint8
 
 // Command is the SSNTP Command operand.
 // It can be CONNECT, START, STOP, STATS, EVACUATE, DELETE, RESTART,
-// AssignPublicIP, ReleasePublicIP, CONFIGURE, AttachVolume or DetachVolume.
+// AssignPublicIP, ReleasePublicIP, CONFIGURE, AttachVolume, DetachVolume or TRACE.
 type Command uint8
 
 // Status is the SSNTP Status operand.
@@ -253,6 +253,19 @@ const (
 	//	|       |       | (0x0) |  (0xb)  |                 |                         |
 	//	+-----------------------------------------------------------------------------+
 	DetachVolume
+
+	// TRACE are out of band commands for pushing trace span payloads to
+	// trace collectors.
+	//
+	// The TRACE command payload is a marshalled array of spans, as defined
+	// in payloads/span.go.
+	//
+	//                                       SSNTP TRACE Command frame
+	//	+-----------------------------------------------------------------------------+
+	//	| Major | Minor | Type  | Operand |  Payload Length | YAML formatted payload  |
+	//	|       |       | (0x0) |  (0xc)  |                 |                         |
+	//	+-----------------------------------------------------------------------------+
+	TRACE
 )
 
 const (
@@ -580,6 +593,8 @@ func (command Command) String() string {
 		return "Attach storage volume"
 	case DetachVolume:
 		return "Detach storage volume"
+	case TRACE:
+		return "TRACE"
 	}
 
 	return ""

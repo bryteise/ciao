@@ -390,6 +390,20 @@ The DetachVolume command payload includes a volume UUID and an instance UUID.
 +-----------------------------------------------------------------------------+
 ```
 
+#### TRACE ####
+TRACE are out of band commands for pushing trace span payloads to trace collectors.
+
+The [TRACE YAML payload]
+(https://github.com/01org/ciao/blob/master/payloads/span.go)
+is a marshalled array of trace spans.
+
+```
++-----------------------------------------------------------------------------+
+| Major | Minor | Type  | Operand |  Payload Length | YAML formatted payload  |
+|       |       | (0x0) |  (0xc)  |                 |                         |
++-----------------------------------------------------------------------------+
+```
+
 ### SSNTP STATUS frames ###
 
 There are 5 different SSNTP STATUS frames:
