@@ -20,22 +20,11 @@ import (
 	"github.com/01org/ciao/payloads"
 )
 
-// Spanner is a span interface for components to add their specific
-// binary payloads to any given Span.
-type Spanner interface {
-	// Span takes a component specific structure and returns a binary payload.
-	Span(componentContext interface{}) []byte
+// Noop is a NO OP span storage backend.
+type Noop struct {
 }
 
-// AnonymousSpanner is the Anonymous component Spanner implementation
-type AnonymousSpanner struct{}
-
-// Span returns a nil payload for Anonymous components.
-func (s AnonymousSpanner) Span(context interface{}) []byte {
+// Store implements the span storage span storing interface.
+func (n *Noop) Store(span payloads.Span) error {
 	return nil
-}
-
-// SpanStore is a span storage interface.
-type SpanStore interface {
-	Store(span payloads.Span) error
 }
