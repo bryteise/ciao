@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/01org/ciao/payloads"
 	"github.com/01org/ciao/ssntp"
 	"github.com/01org/ciao/ssntp/uuid"
@@ -44,6 +46,7 @@ const (
 
 const nullUUID = "00000000-0000-0000-0000-000000000000"
 const spanChannelDepth = 256
+const spanQueueMaxDepth = 16
 
 type status uint8
 
@@ -75,6 +78,9 @@ type Tracer struct {
 	cert         string
 
 	status tracerStatus
+
+	spanQueue     []payloads.Span
+	spanQueueLock sync.Mutex
 }
 
 // TracerConfig represents a tracer configuration.
@@ -215,6 +221,46 @@ func (t *Tracer) dialAndListen() error {
 	return nil
 }
 
+func (t *Tracer) pushSpan(span payloads.Span) error {
+	spanPayload, err := yaml.Marshal(&span)
+	if err != nil {
+		return err
+	}
+
+	_, err = t.ssntp.SendCommand(ssntp.TRACE, spanPayload)
+
+	return err
+}
+
+func (t *Tracer) queueSpan(span payloads.Span) {
+	fmt.Printf("SPAN: %s\n", span)
+
+	defer t.spanQueueLock.Unlock()
+	t.spanQueueLock.Lock()
+
+	t.spanQueue = append(t.spanQueue, span)
+
+	// TODO Build heuristic for figuring out when
+	// is the best time to empty the span queue.
+	// For now we only look at the queue depth.
+
+	if len(t.spanQueue) > spanQueueMaxDepth {
+		queue := t.spanQueue
+
+		for i, s := range queue {
+			err := t.pushSpan(s)
+			if err != nil {
+				continue
+			}
+
+			// Remove span from the queue
+			t.spanQueue = append(queue[:i], queue[i+1:]...)
+		}
+	}
+
+	return
+}
+
 func (t *Tracer) spanListener() {
 	t.status.Lock()
 	t.status.status = running
@@ -224,8 +270,7 @@ func (t *Tracer) spanListener() {
 	for {
 		select {
 		case span := <-t.spanChannel:
-			// TODO Send spans to collectors
-			fmt.Printf("SPAN: %s\n", span)
+			t.queueSpan(span)
 		case <-t.stopChannel:
 			return
 		}
