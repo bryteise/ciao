@@ -247,11 +247,16 @@ func (t *Tracer) Trace(context *Context, componentContext interface{}, format st
 		payload = nil
 	}
 
+	parentUUID := nullUUID
+	if context != nil {
+		parentUUID = context.parentUUID
+	}
+
 	spanUUID := uuid.Generate().String()
 
 	span := payloads.Span{
 		UUID:             spanUUID,
-		ParentUUID:       context.parentUUID,
+		ParentUUID:       parentUUID,
 		CreatorUUID:      t.ssntpUUID,
 		Component:        string(t.component),
 		Timestamp:        time.Now(),
