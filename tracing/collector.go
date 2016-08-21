@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"sync"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/01org/ciao/payloads"
 	"github.com/01org/ciao/ssntp"
 )
@@ -28,8 +30,14 @@ import (
 const TracePort = 9888
 
 type spanCache struct {
+	sync.RWMutex
 	spans []payloads.Span
-	lock  sync.RWMutex
+}
+
+func (c *spanCache) addSpans(spans []payloads.Span) {
+	defer c.Unlock()
+	c.Lock()
+	c.spans = append(c.spans, spans...)
 }
 
 // CollectorConfig represents a collector configuration.
@@ -65,6 +73,20 @@ func (c *Collector) StatusNotify(uuid string, status ssntp.Status, frame *ssntp.
 // Collectors will only handle TRACE command and error frames,
 // and discard all other SSNTP frames.
 func (c *Collector) CommandNotify(uuid string, command ssntp.Command, frame *ssntp.Frame) {
+	if (ssntp.Command)(frame.Operand) != ssntp.CONFIGURE {
+		return
+	}
+
+	go func() {
+		var spans payloads.Spans
+
+		err := yaml.Unmarshal(frame.Payload, &spans)
+		if err != nil {
+			return
+		}
+
+		c.cache.addSpans(spans.Spans)
+	}()
 }
 
 // EventNotify is the event frame notifier.
