@@ -39,14 +39,40 @@ type CollectorConfig struct {
 
 	// Port is the SSNTP port where the collector will listen
 	// for spans.
-	Port int
+	Port uint32
 
 	// CACert is the Certification Authority certificate path
 	// to use when verifiying the peer identity.
 	CAcert string
 
-	// Cert is the tracer x509 signed certificate path.
+	// Cert is the collector x509 signed certificate path.
 	Cert string
+}
+
+// ConnectNotify is the tracer connection notifier.
+func (c *Collector) ConnectNotify(uuid string, role ssntp.Role) {
+}
+
+// DisconnectNotify is the tracer connection notifier.
+func (c *Collector) DisconnectNotify(uuid string, role ssntp.Role) {
+}
+
+// StatusNotify is the status frame notifier.
+func (c *Collector) StatusNotify(uuid string, status ssntp.Status, frame *ssntp.Frame) {
+}
+
+// CommandNotify is the command frame notifier.
+// Collectors will only handle TRACE command and error frames,
+// and discard all other SSNTP frames.
+func (c *Collector) CommandNotify(uuid string, command ssntp.Command, frame *ssntp.Frame) {
+}
+
+// EventNotify is the event frame notifier.
+func (c *Collector) EventNotify(uuid string, event ssntp.Event, frame *ssntp.Frame) {
+}
+
+// ErrorNotify is the error frame notifier.
+func (c *Collector) ErrorNotify(uuid string, error ssntp.Error, frame *ssntp.Frame) {
 }
 
 // Collector represents a ciao trace collector.
@@ -58,7 +84,7 @@ type Collector struct {
 	cache spanCache
 	store SpanStore
 
-	port   int
+	port   uint32
 	caCert string
 	cert   string
 	ssntp  ssntp.Server
@@ -90,4 +116,21 @@ func NewCollector(config *CollectorConfig) (*Collector, error) {
 	}
 
 	return collector, nil
+}
+
+// Start starts the collector.
+// It returns when the collector is ready to process span traces frames.
+func (c *Collector) Start() error {
+	config := &ssntp.Config{
+		Port:   c.port,
+		CAcert: c.caCert,
+		Cert:   c.cert,
+	}
+
+	return c.ssntp.ServeThreadSync(config, c)
+}
+
+// Stop will stop the collector thread, and disconnect all tracers.
+func (c *Collector) Stop() {
+	c.ssntp.Stop()
 }
