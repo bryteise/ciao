@@ -103,6 +103,10 @@ type TracerConfig struct {
 	// This is also where it will push its queued spans.
 	CollectorURI string
 
+	// Port is the SSNTP port where the collector will listen
+	// for spans.
+	Port uint32
+
 	// CACert is the Certification Authority certificate path
 	// to use when verifiying the peer identity.
 	CAcert string
@@ -140,6 +144,14 @@ func NewTracer(config *TracerConfig) (*Tracer, *Context, error) {
 
 	if config.Spanner == nil {
 		config.Spanner = AnonymousSpanner{}
+	}
+
+	if config.Port == 0 {
+		config.Port = TracePort
+	}
+
+	if config.CollectorURI == "" {
+		config.CollectorURI = "127.0.0.1"
 	}
 
 	rootUUID := nullUUID
