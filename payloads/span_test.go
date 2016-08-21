@@ -20,7 +20,7 @@ import (
 
 	. "github.com/01org/ciao/payloads"
 	"github.com/01org/ciao/testutil"
-	"github.com/01org/ciao/tracing"
+	"github.com/01org/ciao/trace"
 	"gopkg.in/yaml.v2"
 )
 
