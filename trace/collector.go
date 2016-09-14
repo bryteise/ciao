@@ -73,7 +73,7 @@ func (c *Collector) StatusNotify(uuid string, status ssntp.Status, frame *ssntp.
 // Collectors will only handle TRACE command and error frames,
 // and discard all other SSNTP frames.
 func (c *Collector) CommandNotify(uuid string, command ssntp.Command, frame *ssntp.Frame) {
-	if (ssntp.Command)(frame.Operand) != ssntp.CONFIGURE {
+	if command != ssntp.TRACE {
 		return
 	}
 
