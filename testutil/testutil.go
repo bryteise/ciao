@@ -16,6 +16,10 @@
 
 package testutil
 
+import(
+	"time"
+)
+
 // Result is a common result structure for tests spanning between
 // controller client, scheduler server, and the various (eg: Agent,
 // NetAgent, CNCIAgent) agent roles.
@@ -26,4 +30,14 @@ type Result struct {
 	TenantUUID   string
 	CNCI         bool
 	VolumeUUID   string
+}
+
+func PollResult(f func() bool, duration time.Duration) bool {
+	for i := 0; i < 10; i++ {
+		if f() {
+			return true
+		}
+		time.Sleep(duration / 10)
+	}
+	return false
 }
