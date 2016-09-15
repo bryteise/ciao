@@ -17,7 +17,7 @@
 package trace
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 
 	"gopkg.in/yaml.v2"
@@ -123,11 +123,11 @@ func NewCollector(config *CollectorConfig) (*Collector, error) {
 	}
 
 	if config.CAcert == "" {
-		return nil, fmt.Errorf("Missing CA")
+		return nil, errors.New("missing CA")
 	}
 
 	if config.Cert == "" {
-		return nil, fmt.Errorf("Missing private key")
+		return nil, errors.New("missing private key")
 	}
 
 	collector := &Collector{
