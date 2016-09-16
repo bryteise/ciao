@@ -17,6 +17,7 @@
 package trace
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -127,15 +128,15 @@ type Context struct {
 // NewTracer creates a new tracer.
 func NewTracer(config *TracerConfig) (*Tracer, *Context, error) {
 	if config.UUID == "" {
-		return nil, nil, fmt.Errorf("Empty SSNTP UUID")
+		return nil, nil, errors.New("empty SSNTP UUID")
 	}
 
 	if config.CAcert == "" {
-		return nil, nil, fmt.Errorf("Missing CA")
+		return nil, nil, errors.New("missing CA")
 	}
 
 	if config.Cert == "" {
-		return nil, nil, fmt.Errorf("Missing private key")
+		return nil, nil, errors.New("missing private key")
 	}
 
 	if config.Component == "" {
@@ -180,14 +181,14 @@ func NewTracer(config *TracerConfig) (*Tracer, *Context, error) {
 	select {
 	case status := <-tracer.statusChannel:
 		if status != running {
-			return nil, nil, fmt.Errorf("Tracer could not start")
+			return nil, nil, errors.New("tracer could not start")
 		}
 
 		return &tracer, &traceContext, nil
 
 	case <-time.After(2 * time.Second):
 		tracer.Stop()
-		return nil, nil, fmt.Errorf("Did not receive a tracer status")
+		return nil, nil, errors.New("did not receive a tracer status")
 	}
 }
 
@@ -245,8 +246,6 @@ func (t *Tracer) pushSpan(span payloads.Span) error {
 }
 
 func (t *Tracer) queueSpan(span payloads.Span) {
-	fmt.Printf("SPAN: %s\n", span)
-
 	defer t.spanQueueLock.Unlock()
 	t.spanQueueLock.Lock()
 
@@ -328,7 +327,7 @@ func (t *Tracer) Trace(context *Context, componentContext interface{}, format st
 	defer t.status.Unlock()
 	t.status.Lock()
 	if t.status.status != running {
-		return nil, fmt.Errorf("Tracer is not running")
+		return nil, errors.New("tracer is not running")
 	}
 
 	t.spanChannel <- span
