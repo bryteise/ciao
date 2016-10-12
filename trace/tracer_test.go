@@ -17,13 +17,21 @@
 package trace
 
 import (
+	"flag"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/01org/ciao/payloads"
+	"github.com/01org/ciao/ssntp"
 	"github.com/01org/ciao/testutil"
 )
+
+var integration bool
+func init() {
+	flag.BoolVar(&integration, "integration", false, "Set to true when running integration tests")
+}
 
 type testSpan struct {
 }
@@ -135,10 +143,12 @@ func TestStop(t *testing.T) {
 
 	if tracer.status.status != stopped {
 		t.Error("Stop didn't update channel status correctly")
+		return
 	}
 
 	if _, ok := <-tracer.stopChannel; ok {
 		t.Error("Channel is not closed")
+		return
 	}
 }
 
@@ -148,4 +158,168 @@ func TestStopNotRunning(t *testing.T) {
 	tracer.status.status = stopped
 
 	tracer.Stop()
+}
+
+func validateNewTracer(tracer *Tracer, config TracerConfig, t *testing.T) {
+	if tracer.ssntpUUID != config.UUID {
+		t.Error("New tracer didn't get correct ssntpUUID")
+	}
+	if tracer.component != config.Component {
+		if config.Component != Anonymous {
+			t.Error("New tracer didn't get correct component")
+		}
+	}
+	if tracer.spanner != config.Spanner {
+		if config.Spanner != nil {
+			t.Error("New tracer didn't get correct spanner")
+		}
+	}
+	if tracer.collectorURI != config.CollectorURI {
+		if config.CollectorURI != "" {
+			t.Error("New tracer didn't get correct collectorURI")
+		}
+	}
+	if tracer.caCert != config.CAcert {
+		t.Error("New tracer didn't get correct caCert")
+	}
+	if tracer.cert != config.Cert {
+		t.Error("New tracer didn't get correct cert")
+	}
+	if config.Port != 1 && config.Port != TracePort {
+		t.Error("New tracer didn't get correct port")
+	}
+}
+
+// NewTracer needs setup for ssntp.Dial (called by dailAndListen)
+type traceMockNotifier struct {}
+func (server *traceMockNotifier) ConnectNotify(uuid string, role ssntp.Role) {
+}
+func (server *traceMockNotifier) DisconnectNotify(uuid string, role ssntp.Role) {
+}
+func (server *traceMockNotifier) StatusNotify(uuid string, status ssntp.Status, frame *ssntp.Frame) {
+}
+func (server *traceMockNotifier) CommandNotify(uuid string, command ssntp.Command, frame *ssntp.Frame) {
+}
+func (server *traceMockNotifier) EventNotify(uuid string, event ssntp.Event, frame *ssntp.Frame) {
+}
+func (server *traceMockNotifier) ErrorNotify(uuid string, error ssntp.Error, frame *ssntp.Frame) {
+}
+
+func newTracerDefaultRunner(part string, t *testing.T) {
+	config := TracerConfig{}
+	configFile := testutil.GetConfigFile("tracer-test")
+	caPath, schedulerPath, err := testutil.RoleToTestCertPath(ssntp.SCHEDULER)
+	if err != nil {
+		t.Error("Unable to get scheduler cert path")
+		return
+	}
+	_, agentPath, err := testutil.RoleToTestCertPath(ssntp.AGENT)
+	if err != nil {
+		t.Error("Unable to get agent cert path")
+		return
+	}
+
+	config.UUID = "uuid"
+	config.CAcert = caPath
+	config.Cert = agentPath
+	config.Component = SSNTP
+	config.Spanner = testSpan{}
+	config.Port = 1
+	config.CollectorURI = "127.0.0.1"
+	if part == "component" {
+		config.Component = ""
+	} else if part == "spanner" {
+		config.Spanner = nil
+	} else if part == "port" {
+		config.Port = 0
+	} else if part == "collectoruri" {
+		config.CollectorURI = ""
+	}
+	ssntpConfig := ssntp.Config{}
+	ssntpConfig.CAcert = caPath
+	ssntpConfig.Cert = schedulerPath
+	ssntpConfig.ConfigURI = configFile
+	ssntpConfig.UUID = "suuid"
+	ssntpConfig.Log = ssntp.Log
+	serv := ssntp.Server{}
+	serv.ServeThreadSync(&ssntpConfig, &traceMockNotifier{})
+
+	tracer, tracerContext, err := NewTracer(&config)
+	if err != nil {
+		t.Error("Error creating New Tracer")
+		return
+	}
+	validateNewTracer(tracer, config, t)
+	if tracerContext.parentUUID != nullUUID {
+		t.Error("New tracer didn't set correct TracerContext")
+	}
+	tracer.Stop()
+	serv.Stop()
+}
+
+func TestNewTracerDefaultComponent(t *testing.T) {
+	newTracerDefaultRunner("component", t)
+}
+
+func TestNewTracerDefaultSpanner(t *testing.T) {
+	newTracerDefaultRunner("spanner", t)
+}
+
+func TestNewTracerDefaultPort(t *testing.T) {
+	newTracerDefaultRunner("port", t)
+}
+
+func TestNewTracerDefaultCollectorURI(t *testing.T) {
+	newTracerDefaultRunner("collectoruri", t)
+}
+
+func TestPushSpan(t *testing.T) {
+	config := TracerConfig{}
+	configFile := testutil.GetConfigFile("tracer-test")
+
+	config.UUID = "uuid"
+	caPath, agentPath, err := testutil.RoleToTestCertPath(ssntp.AGENT)
+	if err != nil {
+		t.Error("Missing agent test cert")
+		return
+	}
+	config.CAcert = caPath
+	config.Cert = agentPath
+
+	_, schedulerPath, err := testutil.RoleToTestCertPath(ssntp.SCHEDULER)
+	if err != nil {
+		t.Error("Missing scheduler test cert")
+	}
+	ssntpConfig := ssntp.Config{}
+	ssntpConfig.CAcert = caPath
+	ssntpConfig.Cert = schedulerPath
+	ssntpConfig.ConfigURI = configFile
+	ssntpConfig.UUID = "suuid"
+	serv := ssntp.Server{}
+	serv.ServeThreadSync(&ssntpConfig, &traceMockNotifier{})
+
+	tracer, _, err := NewTracer(&config)
+	if err != nil {
+		t.Error("Error creating New Tracer")
+		return
+	}
+
+	span := payloads.Span{"uuid", "puuid", "cuuid", time.Time{}, "comp", []byte{0}, "msg"}
+	err = tracer.pushSpan(span)
+	if err != nil {
+		t.Error("Error running pushSpan")
+	}
+
+	tracer.Stop()
+	serv.Stop()
+}
+
+func TestMain(m *testing.M) {
+	if err := testutil.MakeTestCerts(); err != nil {
+		fmt.Println("Unable to create test certs for tracer")
+		os.Exit(-1)
+	}
+	result := m.Run()
+	testutil.RemoveTestCerts()
+	os.Exit(result)
 }

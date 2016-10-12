@@ -1,0 +1,19 @@
+configure:
+  scheduler:
+    storage_uri: /unused
+  storage:
+    ceph_id: ciao
+  controller:
+    compute_ca: /unused
+    compute_cert: /unused
+    identity_user: csr
+    identity_password: hello
+  image_service:
+    url: http://unused
+  launcher:
+    compute_net: [127.0.0.1/24]
+    mgmt_net: [127.0.0.1/24]
+    disk_limit: false
+    mem_limit: false
+  identity_service:
+    url: http://unused
