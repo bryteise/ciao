@@ -17,6 +17,7 @@
 package trace
 
 import (
+	"flag"
 	"fmt"
 	"testing"
 	"time"
@@ -24,6 +25,11 @@ import (
 	"github.com/01org/ciao/payloads"
 	"github.com/01org/ciao/testutil"
 )
+
+var integration bool
+func init() {
+	flag.BoolVar(&integration, "integration", false, "Set to true when running integration tests")
+}
 
 type testSpan struct {
 }
@@ -148,4 +154,10 @@ func TestStopNotRunning(t *testing.T) {
 	tracer.status.status = stopped
 
 	tracer.Stop()
+}
+
+// Functional test, need setup for ssntp.Dial
+func TestNewTracer(t *testing.T) {
+	caCert, cert = testutil.GetCertPaths()
+	
 }
