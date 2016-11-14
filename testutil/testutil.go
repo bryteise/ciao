@@ -17,6 +17,8 @@
 package testutil
 
 import(
+	"path"
+	"runtime"
 	"time"
 )
 
@@ -40,4 +42,15 @@ func PollResult(f func() bool, duration time.Duration) bool {
 		time.Sleep(duration / 10)
 	}
 	return false
+}
+
+func GetConfigFile(test string) string {
+	_, filename, _, _ := runtime.Caller(0)
+	confDir := path.Dir(filename)
+
+	switch test {
+	case "tracer-test":
+		return path.Join("file://", confDir, "tracer-test-config-file")
+	}
+	return ""
 }
