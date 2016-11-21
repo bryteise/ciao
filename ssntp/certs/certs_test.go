@@ -172,7 +172,7 @@ func TestCreateServerCert(t *testing.T) {
 	hosts := []string{"test.example.com", "test2.example.com"}
 	mgmtIPs := []string{}
 
-	template, err := CreateCertTemplate(ssntp.AGENT, "ACME Corp", "test@example.com", hosts, mgmtIPs)
+	template, err := CreateCertTemplate(ssntp.SCHEDULER, "ACME Corp", "test@example.com", hosts, mgmtIPs)
 	if err != nil {
 		t.Errorf("Unexpected error when creating cert template: %v", err)
 	}
@@ -230,17 +230,22 @@ func TestCreateClientCert(t *testing.T) {
 	hosts := []string{"test.example.com", "test2.example.com"}
 	mgmtIPs := []string{}
 
-	template, err := CreateCertTemplate(ssntp.AGENT, "ACME Corp", "test@example.com", hosts, mgmtIPs)
+	schedulerTemplate, err := CreateCertTemplate(ssntp.SCHEDULER, "ACME Corp", "test@example.com", hosts, mgmtIPs)
 	if err != nil {
-		t.Errorf("Unexpected error when creating cert template: %v", err)
+		t.Errorf("Unexpected error when creating scheduler cert template: %v", err)
 	}
 
-	err = CreateServerCert(template, false, &certOutput, &caCertOutput)
+	agentTemplate, err := CreateCertTemplate(ssntp.AGENT, "ACME Corp", "test@example.com", hosts, mgmtIPs)
+	if err != nil {
+		t.Errorf("Unexpected error when creating agent cert template: %v", err)
+	}
+
+	err = CreateServerCert(schedulerTemplate, false, &certOutput, &caCertOutput)
 	if err != nil {
 		t.Errorf("Unexpected error when creating server cert: %v", err)
 	}
 
-	err = CreateClientCert(template, false, certOutput.Bytes(), &clientCertOutput)
+	err = CreateClientCert(agentTemplate, false, certOutput.Bytes(), &clientCertOutput)
 	if err != nil {
 		t.Errorf("Unexpected error when creating client cert: %v", err)
 	}

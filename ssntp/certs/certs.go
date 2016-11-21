@@ -164,8 +164,16 @@ func CreateCertTemplate(role ssntp.Role, organization string, email string, host
 	return &template, nil
 }
 
+func isTemplateForServer(template *x509.Certificate) bool {
+	templateRole := ssntp.GetRoleFromOIDs(template.UnknownExtKeyUsage)
+	return templateRole == ssntp.SCHEDULER || templateRole == ssntp.SERVER
+}
+
 // CreateServerCert creates the server certificate and the CA certificate. Both are written out PEM encoded.
 func CreateServerCert(template *x509.Certificate, useElliptic bool, certOutput io.Writer, caCertOutput io.Writer) error {
+	if !isTemplateForServer(template) {
+		return fmt.Errorf("Unable to create server cert for non server roles")
+	}
 	priv, err := generatePrivateKey(useElliptic)
 	if err != nil {
 		return fmt.Errorf("Unable to create private key: %v", err)
@@ -204,6 +212,9 @@ func CreateServerCert(template *x509.Certificate, useElliptic bool, certOutput i
 
 // CreateClientCert creates the client certificate signed by the giver server certificate. It is written PEM encoded.
 func CreateClientCert(template *x509.Certificate, useElliptic bool, serverCert []byte, certOutput io.Writer) error {
+	if isTemplateForServer(template) {
+		return fmt.Errorf("Unable to create client cert for server roles")
+	}
 	priv, err := generatePrivateKey(useElliptic)
 	if err != nil {
 		return fmt.Errorf("Unable to create private key: %v", err)
