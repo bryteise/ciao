@@ -222,6 +222,7 @@ func (t *Tracer) dialAndListen() error {
 		// TODO Add tracing specific port here
 		CAcert: t.caCert,
 		Cert:   t.cert,
+		UUID:   t.ssntpUUID,
 	}
 
 	err := t.ssntp.Dial(config, t)
