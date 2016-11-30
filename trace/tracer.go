@@ -346,6 +346,7 @@ func (t *Tracer) Stop() {
 	if t.status.status != running {
 		return
 	}
+	t.ssntp.Close()
 
 	t.status.status = stopped
 	close(t.stopChannel)
